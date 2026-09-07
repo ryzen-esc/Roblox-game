@@ -112,7 +112,11 @@ src/StarterPlayer/StarterPlayerScripts/
 
 ## Known bugs
 
-None currently open. The three found via live playtesting (above) are fixed. Nothing else has been confirmed against a live server yet — keep working through the manual checklist in `docs/07_TESTING.md` and report the exact Output-window error text for anything that breaks; that's the fastest path to a fix.
+None currently open. Four found via live playtesting are fixed, most recently: all 50 tank-plot "Empty Tank" billboards had `AlwaysOnTop = true` and no `MaxDistance`, so any view catching several plots turned into a wall of overlapping text (caught from a screenshot of a live test — commit `758f787`). Fix: billboards start disabled and only turn on once a player claims that plot, and cap at 40 studs render distance. Nothing else has been confirmed against a live server yet — keep working through the manual checklist in `docs/07_TESTING.md` and report screenshots/exact Output-window error text for anything that looks or feels wrong; that's the fastest path to a fix.
+
+## Visual polish is currently MVP-grade, by design (revisit after the loop is validated)
+
+The map/UI use flat colors and plain BaseParts (no textures, lighting pass, or custom materials) — this was a deliberate scoping choice (brief: MVP-first, don't invest in art before the core loop is proven fun), not an oversight. Expect it to look rough right now. The billboard-overlap bug above was a genuine functional bug (made text unreadable) and got fixed immediately; general art/lighting polish is correctly deferred to the "IMPORTANT after validation" tier and shouldn't be mistaken for the same category of problem.
 
 ## Incomplete / deferred features (by design, see `04_GAME_DESIGN_DOCUMENT.md` MUST/IMPORTANT/OPTIONAL split)
 
