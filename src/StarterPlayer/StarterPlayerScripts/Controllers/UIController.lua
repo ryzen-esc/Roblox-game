@@ -1,5 +1,8 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Constants = require(ReplicatedStorage.Shared.Constants)
 
 local player = Players.LocalPlayer
 
@@ -85,6 +88,24 @@ function UIController.init()
 		Parent = screenGui,
 	})
 	newCorner(10).Parent = reelFrame
+
+	-- "Perfect" target zone marker: a fixed band centered on where the server scores a
+	-- perfect catch (Constants.PERFECT_REEL_SECONDS out of REEL_WINDOW_SECONDS). Tapping
+	-- anywhere during the sweep still catches something -- this just shows where to aim
+	-- for the best size/quality. Created before the indicator so the indicator renders
+	-- on top of it (Roblox layers GUI siblings in creation order within the same ZIndex).
+	local perfectCenter = Constants.PERFECT_REEL_SECONDS / Constants.REEL_WINDOW_SECONDS
+	local perfectZoneWidth = 0.08
+	local targetZone = newFrame({
+		Name = "TargetZone",
+		Size = UDim2.new(perfectZoneWidth, 0, 1, 0),
+		Position = UDim2.new(perfectCenter, 0, 0, 0),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = Color3.fromRGB(90, 220, 120),
+		BackgroundTransparency = 0.2,
+		Parent = reelFrame,
+	})
+	newCorner(4).Parent = targetZone
 
 	local reelIndicator = newFrame({
 		Name = "Indicator",
