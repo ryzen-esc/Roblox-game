@@ -1,6 +1,6 @@
 # PROJECT STATE — Fish Tank Simulator
 
-**Last updated:** 2026-09-07 (session 2 — post-playtest fixes + full re-review). Read this file first if resuming this project with no other context — it's written to be self-sufficient.
+**Last updated:** 2026-09-07 (session 3 — added IMPORTANT-tier systems: achievements, rebirth, daily featured species, analytics, DataStore backup). Read this file first if resuming this project with no other context — it's written to be self-sufficient.
 
 ## What this is
 
@@ -39,26 +39,29 @@ Scored highest (126/150) of 21 researched concepts, ahead of idle-clicker (96) a
 
 ```
 default.project.json                              -- Rojo project definition
+.gitignore                                         -- excludes local rojo.exe / *.rbxl (not game source)
 
 docs/
   01_MARKET_RESEARCH.md                            -- Phase 1: market snapshot, 21 concepts
   02_CONCEPT_SCORING.md                            -- Phase 2: full scoring table, top 3, final pick
   03_CORE_LOOP.md                                  -- Phase 3: loop validation, session-by-session hooks
-  04_GAME_DESIGN_DOCUMENT.md                       -- Phase 4: full GDD, MUST/IMPORTANT/OPTIONAL split
+  04_GAME_DESIGN_DOCUMENT.md                       -- Phase 4: full GDD, MUST/IMPORTANT/OPTIONAL split (partially stale -- see Feature status below for what's since been built)
   05_MONETIZATION.md                               -- Phase 5: products, revenue model, DevEx math
-  06_ARCHITECTURE.md                               -- Phase 6: file tree, data model, remote protocol, security
+  06_ARCHITECTURE.md                               -- Phase 6: file tree, data model, remote protocol, security (file tree section is stale, this file's map below is current)
   07_TESTING.md                                    -- Phase 8: adversarial code review + manual test checklist
   08_PRESENTATION.md                               -- Phase 10: name, icon/thumbnail concepts, copy
   09_LAUNCH_CHECKLIST.md                           -- Phase 11: exact manual steps for the user
   10_POST_LAUNCH_ITERATION.md                      -- Phase 12: funnel diagnosis framework
 
 src/ReplicatedStorage/Shared/                      -- ModuleScripts, shared by client+server
-  Constants.lua                                    -- ALL tunable numbers (cooldowns, growth time, caps, etc.)
+  Constants.lua                                    -- ALL tunable numbers (cooldowns, growth time, caps, rebirth bonus, featured-species weight, etc.)
   RemoteNames.lua                                   -- canonical remote name list
   RarityConfig.lua                                  -- 5 rarity tiers (Common..Legendary), weighted roll fn
-  FishData.lua                                      -- 6 species (Minnow..Koi), weighted roll fn
+  FishData.lua                                      -- 6 species (Minnow..Koi), weighted roll fn + deterministic daily-featured-species fn
   UpgradeConfig.lua                                 -- Rod/Tank/Bait cost curves + effect formulas
+  FishValue.lua                                     -- shared pure sell-value formula (used by TankService sell AND RebirthService liquidation)
   FishModelFactory.lua                              -- builds a procedural (part-based) fish Model
+  AchievementConfig.lua                             -- 13 achievement definitions (pure `check(data)` fns, Coin reward, placeholder badgeId)
   MonetizationIds.lua                               -- Game Pass / Dev Product IDs (PLACEHOLDERS = 0, see below)
 
 src/ServerScriptService/
@@ -66,12 +69,15 @@ src/ServerScriptService/
   Services/
     RemoteSetup.lua                                 -- creates ReplicatedStorage.Remotes + RemoteEvents
     RateLimiter.lua                                 -- generic per-player-per-key cooldown backstop
-    MapBuilderService.lua                           -- procedurally builds dock/water/spawn/tank-plot grid (24 plots)
-    PlayerDataService.lua                           -- DataStore load/save w/ retry, offline growth, autosave, BindToClose
-    FishingService.lua                              -- cast/reel state machine, server RNG, Auto-Fisher loop
-    TankService.lua                                 -- growth ticking (online), selling
+    MapBuilderService.lua                           -- procedurally builds dock/water/spawn/tank-plot grid (50 plots); plot signs hidden until claimed, capped render distance
+    PlayerDataService.lua                           -- DataStore load/save w/ retry, offline growth, autosave, BindToClose, + secondary backup DataStore (write-after-save, read-on-primary-load-failure)
+    GameAnalyticsService.lua                        -- thin pcall-wrapped wrapper around Roblox's free AnalyticsService (onboarding funnel + economy events)
+    FishingService.lua                              -- cast/reel state machine, server RNG, Auto-Fisher loop, daily-featured-species bias
+    TankService.lua                                 -- growth ticking (online), selling (via shared FishValue)
     ShopService.lua                                 -- Rod/Tank/Bait Coin-upgrade purchases
     MonetizationService.lua                         -- Game Pass ownership cache, Developer Product ProcessReceipt
+    AchievementService.lua                          -- checks all achievement defs after any relevant mutation, grants Coins + optional Badge
+    RebirthService.lua                              -- prestige reset (liquidate fish, reset Coins/Rod/Tank, +sell-value bonus, gated on Rod+Tank maxed)
     AnnouncementService.lua                          -- server-wide rare-catch broadcast
     DailyRewardService.lua                           -- 7-day login streak reward
 
@@ -79,11 +85,12 @@ src/StarterPlayer/StarterPlayerScripts/
   Client.client.lua                                 -- bootstrap: builds UI, wires all controllers
   Controllers/
     ClientState.lua                                  -- client mirror of server PlayerDataSync payload
-    UIController.lua                                 -- builds ALL ScreenGui via code (HUD/Shop/Tank/Reel/Daily)
+    UIController.lua                                 -- builds ALL ScreenGui via code (HUD/Shop/Tank/Achievements/Reel/Daily/Rebirth-confirm)
     FishingController.lua                            -- cast prompt + reel minigame + catch/announcement feedback
     TankRenderController.lua                         -- renders own fish as swimming procedural models in tank plot
-    ShopController.lua                                -- Coin-upgrade rows + Game Pass/Product purchase buttons
+    ShopController.lua                                -- Coin-upgrade rows + Rebirth row/confirm + Game Pass/Product purchase buttons
     InventoryController.lua                           -- Coins label, sell list, daily reward popup
+    AchievementController.lua                         -- Achievements panel (from ClientState) + unlock toast banner + featured-species HUD label
 ```
 
 ## Economy values as currently tuned (all in `Constants.lua` / `UpgradeConfig.lua` / `RarityConfig.lua` / `FishData.lua` — **untested against real players, expect to retune after first playtest**)
@@ -94,8 +101,11 @@ src/StarterPlayer/StarterPlayerScripts/
 - Rod/Tank/Bait costs: geometric curves (baseCost × growth^(level-1)), Rod ×1.6/lvl from 50, Tank ×1.55/lvl from 75, Bait ×1.5/lvl from 40. Max levels 10/10/5.
 - Rarity weights (Common..Legendary): 60/25/10/4/1, gated by rod level (Legendary needs rod level 6+).
 - 6 species (Minnow..Koi), base values 4–55 Coins, gated by rod level 1–4.
-- Sell value formula: `baseValue × rarityMultiplier × (0.5 + 0.5×growth) × rodValueBonus × coinPassMultiplier`.
+- Sell value formula (now in shared `FishValue.compute`): `baseValue × rarityMultiplier × (0.5 + 0.5×growth) × rodValueBonus × rebirthBonus × coinPassMultiplier`.
 - Daily reward: 7-day escalating table (20/30/45/65/90/120/200 Coins), gentle reset (not punishing) on a missed day.
+- Rebirth: unlocked at Rod Lv.10 + Tank Lv.10. Liquidates all fish at current value, resets Coins/Rod/Tank to 1 (Bait untouched), +15% sell value per rebirth forever (`Constants.REBIRTH_SELL_BONUS_PER_REBIRTH`).
+- Daily featured species: deterministic by UTC day (`FishData.getFeaturedSpeciesId`), 2x roll weight (`Constants.FEATURED_SPECIES_WEIGHT_MULTIPLIER`) among eligible species.
+- Achievements: 13 milestones (catch counts, first-rarity catches, maxed tracks, full tank, first rebirth), 10–500 Coins each, listed in `AchievementConfig.lua`.
 
 ## Monetization IDs — ACTION REQUIRED BEFORE LAUNCH
 
@@ -118,18 +128,28 @@ None currently open. Four found via live playtesting are fixed, most recently: a
 
 The map/UI use flat colors and plain BaseParts (no textures, lighting pass, or custom materials) — this was a deliberate scoping choice (brief: MVP-first, don't invest in art before the core loop is proven fun), not an oversight. Expect it to look rough right now. The billboard-overlap bug above was a genuine functional bug (made text unreadable) and got fixed immediately; general art/lighting polish is correctly deferred to the "IMPORTANT after validation" tier and shouldn't be mistaken for the same category of problem.
 
-## Incomplete / deferred features (by design, see `04_GAME_DESIGN_DOCUMENT.md` MUST/IMPORTANT/OPTIONAL split)
+## Feature status vs. the GDD (`04_GAME_DESIGN_DOCUMENT.md`)
 
-Not built yet, intentionally, to keep MVP scope tight:
-- Second biome/dock, achievements/badges, cosmetics (tank décor, rod skins), player trading, rebirth/prestige, friends-only leaderboard, entering another player's tank room, custom AnalyticsService events.
-- These are the natural "IMPORTANT (post-validation)" backlog — build them only after the manual test checklist passes and the core loop is confirmed fun in actual play, not before.
+**Now built** (session 3, added on top of the MUST-HAVE MVP without any live playtesting confirmation yet -- flagged below):
+- Achievements (13 milestones, Coin rewards, optional free Badge integration -- badge IDs are placeholder 0 like Game Passes; note Roblox may charge a small Robux fee to *create* a Badge, verify current Creator Hub pricing before making any).
+- Rebirth/prestige (Rod+Tank maxed -> reset for permanent sell-value bonus).
+- Daily featured species (free, zero-content-cost variety).
+- Custom AnalyticsService events (onboarding funnel + economy Source/Sink), verified against Roblox's current `LogEconomyEvent`/`LogOnboardingFunnelStepEvent` signatures via their docs before writing (analytics calls only fire in a published, live server -- they're no-ops in Studio, by Roblox's own design, so this can't be verified until after a real publish).
+- Secondary/backup DataStore for save-corruption recovery.
+
+**Still not built** (remaining IMPORTANT/OPTIONAL backlog, in rough priority order):
+- Player-to-player trading (deliberately deferred -- highest exploit surface of anything left on the list; needs careful anti-dupe design before touching, see `06_ARCHITECTURE.md`'s security section for the standard this codebase holds itself to).
+- A simple leaderboard view (docs/04 scoped this as "friends-only"; a same-server "top earners" list would be the cheap first version -- no new DataStore needed, just rank currently-connected players by `lifetimeCoinsEarned`).
+- Second biome/dock, tank décor + rod skin cosmetics, entering another player's tank room, Roblox platform Badges (the *creation* step, not the awarding code -- that's already wired and just needs real IDs).
+- Settings panel / audio (mute toggle) -- blocked on the user selecting actual audio catalog IDs they have rights to use, since the brief requires that be a human decision; the UI hook can be added cheaply once IDs exist.
 
 ## Immediate next action
 
-1. **User:** Rojo sync is already working (three live-play crashes have been caught and fixed). Keep working through the manual test checklist in `docs/07_TESTING.md` — multiplayer (2+ clients), reconnection/offline-growth, and the exploit-probing section haven't been explicitly confirmed yet as of this session.
-2. **Report back** the exact Output-window error text for anything that breaks (fastest path to a fix), and separately, how the core loop *feels* — pacing (reel window, growth time) is the most likely thing to need retuning after more hands-on play.
-3. Once the core loop is confirmed fun and functional, proceed to `docs/09_LAUNCH_CHECKLIST.md` steps 3+ (create real Game Passes/Developer Products, fill in `MonetizationIds.lua`, publish).
-4. After real players arrive, use `docs/10_POST_LAUNCH_ITERATION.md`'s funnel framework rather than guessing at new features.
+1. **User:** Re-sync via Rojo and playtest the newly-added systems (achievements panel + toast, Rebirth flow once Rod+Tank are maxed -- may need to temporarily lower `Constants.MAX_ROD_LEVEL`/`MAX_TANK_LEVEL` or upgrade costs to reach that quickly for a test, then revert -- daily featured species label, tank-plot sign fix). None of this has been run in Studio yet; treat it as higher-risk than the already-tested MVP core loop until confirmed.
+2. Keep working through the manual test checklist in `docs/07_TESTING.md` — multiplayer (2+ clients), reconnection/offline-growth, and the exploit-probing section still haven't been explicitly confirmed as of this session.
+3. **Report back** the exact Output-window error text for anything that breaks (fastest path to a fix), plus how the core loop and new systems *feel* — Rebirth pacing (is Rod+Tank maxed a reasonable time investment before the first prestige?) is the most speculative number added this session and most likely to need retuning.
+4. Once everything above is confirmed fun and functional, proceed to `docs/09_LAUNCH_CHECKLIST.md` steps 3+ (create real Game Passes/Developer Products, fill in `MonetizationIds.lua`, publish).
+5. After real players arrive, use `docs/10_POST_LAUNCH_ITERATION.md`'s funnel framework (now backed by real custom analytics events, not just Roblox's built-in visit/retention stats) rather than guessing at new features.
 
 ## Local dev artifacts (not in git)
 
