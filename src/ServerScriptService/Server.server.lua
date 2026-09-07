@@ -1,6 +1,6 @@
 local Players = game:GetService("Players")
 
-local Services = script.Services
+local Services = script.Parent.Services
 
 local RemoteSetup = require(Services.RemoteSetup)
 local RateLimiter = require(Services.RateLimiter)
