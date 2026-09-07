@@ -1,0 +1,9 @@
+# Local dev tooling / test artifacts -- not part of the game source, don't belong in git.
+rojo.exe
+*.rbxl
+*.rbxlx
+*.rbxlx.lock
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db

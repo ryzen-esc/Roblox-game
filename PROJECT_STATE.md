@@ -1,6 +1,6 @@
 # PROJECT STATE — Fish Tank Simulator
 
-**Last updated:** 2026-09-07 (initial build session). Read this file first if resuming this project with no other context — it's written to be self-sufficient.
+**Last updated:** 2026-09-07 (session 2 — post-playtest fixes + full re-review). Read this file first if resuming this project with no other context — it's written to be self-sufficient.
 
 ## What this is
 
@@ -103,15 +103,16 @@ src/StarterPlayer/StarterPlayerScripts/
 
 ## Test status
 
-**No in-engine testing has occurred** — this build session had no Roblox Studio access (text-only environment). A full adversarial code review was performed instead (documented in `docs/07_TESTING.md`) and two real issues were found and fixed during that review:
-1. `MonetizationService.processReceipt` now force-saves synchronously before returning `PurchaseGranted`, closing a crash window where a paid Developer Product purchase could otherwise be lost.
-2. `PlayerDataService`'s `game:BindToClose` handler now uses a separate `saveForShutdown` path with only 2 retries (vs. the normal 5 with longer exponential backoff), since Roblox gives shutdown a limited total time budget across *all* players — the original code risked exhausting that budget retrying one player's save and leaving others unsaved.
+**In-engine testing is underway** — the user has Rojo + Studio set up locally (a local `game test.rbxl` and `rojo.exe` exist in the working folder; both are gitignored as local artifacts, not part of the source). Three real crashes have been found by actually playing and fixed since the initial build:
+1. `Server.server.lua` referenced `script.Services` instead of `script.Parent.Services` — fixed (commit `551ae3e`).
+2. Dock/water/cast-spot part placement let players fall into the water / cast spot was positioned past the dock's edge — fixed (commit `02825d9`).
+3. `UIController` set a nonexistent `ScreenGui.ResetOnSpawnGui` property, which crashed client UI construction — fixed (commit `d1de7b3`); the reel bar also gained a visible "perfect" target-zone marker since (commit `ccf8a92`).
 
-A complete manual test checklist is written and waiting for the user to run in Studio (`docs/07_TESTING.md`).
+**Session 2 (this session):** did a complete line-by-line re-review of every file in `src/` (all Shared modules, all server Services, all client Controllers) specifically hunting for the same class of bug that caused the three fixes above (invalid/misspelled Roblox API members, Rojo path mismatches, nil-handling gaps). No new bugs found — every remote handler still validates payload shape, every service still recomputes costs/ownership server-side, and no other suspicious API member names were found. Treat this as "passed static re-review," not "passed live testing" — the manual checklist in `docs/07_TESTING.md` still needs to be run end-to-end by the user and is the higher-value next step.
 
 ## Known bugs
 
-None confirmed yet (nothing has run live). Treat everything as unverified until the manual checklist in `docs/07_TESTING.md` is executed.
+None currently open. The three found via live playtesting (above) are fixed. Nothing else has been confirmed against a live server yet — keep working through the manual checklist in `docs/07_TESTING.md` and report the exact Output-window error text for anything that breaks; that's the fastest path to a fix.
 
 ## Incomplete / deferred features (by design, see `04_GAME_DESIGN_DOCUMENT.md` MUST/IMPORTANT/OPTIONAL split)
 
@@ -121,10 +122,14 @@ Not built yet, intentionally, to keep MVP scope tight:
 
 ## Immediate next action
 
-1. **User:** Follow `docs/09_LAUNCH_CHECKLIST.md` step 1 (Rojo sync into Studio) and run the manual test checklist in `docs/07_TESTING.md`.
-2. **Report back** what breaks/feels off — pacing (reel window, growth time) is the most likely thing to need retuning after first hands-on play.
+1. **User:** Rojo sync is already working (three live-play crashes have been caught and fixed). Keep working through the manual test checklist in `docs/07_TESTING.md` — multiplayer (2+ clients), reconnection/offline-growth, and the exploit-probing section haven't been explicitly confirmed yet as of this session.
+2. **Report back** the exact Output-window error text for anything that breaks (fastest path to a fix), and separately, how the core loop *feels* — pacing (reel window, growth time) is the most likely thing to need retuning after more hands-on play.
 3. Once the core loop is confirmed fun and functional, proceed to `docs/09_LAUNCH_CHECKLIST.md` steps 3+ (create real Game Passes/Developer Products, fill in `MonetizationIds.lua`, publish).
 4. After real players arrive, use `docs/10_POST_LAUNCH_ITERATION.md`'s funnel framework rather than guessing at new features.
+
+## Local dev artifacts (not in git)
+
+`game test.rbxl` (the user's local Studio save synced via Rojo) and `rojo.exe` (the Rojo CLI binary) exist in the working folder but are gitignored (`.gitignore` added session 2) — they're local tooling, not game source, and don't belong in version control (rojo.exe alone is ~15MB).
 
 ## If resuming this project fresh (for another model/session)
 
