@@ -32,7 +32,11 @@ local function buildDockAndWater()
 	local water = Instance.new("Part")
 	water.Name = "Water"
 	water.Size = Vector3.new(120, 2, 80)
-	water.Position = Vector3.new(0, 0.2, -70)
+	-- Top surface (Position.Y + Size.Y/2) must sit clearly below the dock's walking
+	-- surface, or a player standing at the dock's edge ends up with the camera inside
+	-- the water part, which triggers Roblox's underwater fog/tint even though the part
+	-- is non-collidable. Top surface here: 0.4 studs, vs. the dock's 1 stud.
+	water.Position = Vector3.new(0, -0.6, -70)
 	water.Anchored = true
 	water.CanCollide = false
 	water.Material = Enum.Material.Water
@@ -52,7 +56,10 @@ local function buildDockAndWater()
 	local castPrompt = Instance.new("Part")
 	castPrompt.Name = "CastSpot"
 	castPrompt.Size = Vector3.new(4, 1, 4)
-	castPrompt.Position = Vector3.new(0, 1.2, -45)
+	-- Must sit within the dock's footprint (Z from -43 to -27) and on top of its
+	-- walking surface (dock top = 1, so this part's center = 1 + Size.Y/2 = 1.5) --
+	-- previously this was placed past the dock's edge, out over the water.
+	castPrompt.Position = Vector3.new(0, 1.5, -40)
 	castPrompt.Anchored = true
 	castPrompt.CanCollide = false
 	castPrompt.Material = Enum.Material.Neon
