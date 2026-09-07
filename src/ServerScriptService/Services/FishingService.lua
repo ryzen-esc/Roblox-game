@@ -24,6 +24,8 @@ local remotes = nil
 local rateLimiter = nil
 local announcementService = nil
 local monetizationService = nil
+local achievementService = nil
+local analyticsService = nil
 
 local function fishCount(data): number
 	local count = 0
@@ -52,7 +54,7 @@ end
 local function rollAndAwardFish(player: Player, data, quality: number)
 	local rareBias = effectiveRareBias(player, data)
 	local rarityId = RarityConfig.rollRarity(data.rodLevel, rareBias)
-	local speciesId = FishData.rollSpecies(data.rodLevel)
+	local speciesId = FishData.rollSpecies(data.rodLevel, FishData.getFeaturedSpeciesId())
 	local sizeRoll = math.clamp(quality * (0.7 + math.random() * 0.3), 0, 1)
 
 	local uid = tostring(data.nextFishUid)
@@ -64,6 +66,16 @@ local function rollAndAwardFish(player: Player, data, quality: number)
 		growth = 0,
 		caughtAt = os.time(),
 	}
+
+	data.totalFishCaught = (data.totalFishCaught or 0) + 1
+	data.rarityCatchCounts[rarityId] = (data.rarityCatchCounts[rarityId] or 0) + 1
+
+	if analyticsService then
+		analyticsService.logFunnelStepOnce(player, data, "FirstCatch")
+	end
+	if achievementService then
+		achievementService.checkAll(player, data)
+	end
 
 	PlayerDataService.sync(player)
 	remotes[RemoteNames.CATCH_RESULT]:FireClient(player, {
@@ -117,6 +129,10 @@ local function onCastRequest(player: Player)
 		return
 	end
 
+	if analyticsService then
+		analyticsService.logFunnelStepOnce(player, data, "FirstCast")
+	end
+
 	nextToken[player.UserId] = (nextToken[player.UserId] or 0) + 1
 	local token = nextToken[player.UserId]
 	pendingAttempts[player.UserId] = { token = token, startClock = os.clock() }
@@ -166,11 +182,20 @@ local function autoFisherLoop()
 	end
 end
 
-function FishingService.init(remotesTable, rateLimiterInstance, announcementServiceModule, monetizationServiceModule)
+function FishingService.init(
+	remotesTable,
+	rateLimiterInstance,
+	announcementServiceModule,
+	monetizationServiceModule,
+	achievementServiceModule,
+	analyticsServiceModule
+)
 	remotes = remotesTable
 	rateLimiter = rateLimiterInstance
 	announcementService = announcementServiceModule
 	monetizationService = monetizationServiceModule
+	achievementService = achievementServiceModule
+	analyticsService = analyticsServiceModule
 
 	remotes[RemoteNames.CAST_REQUEST].OnServerEvent:Connect(onCastRequest)
 	remotes[RemoteNames.REEL_ATTEMPT].OnServerEvent:Connect(onReelAttempt)

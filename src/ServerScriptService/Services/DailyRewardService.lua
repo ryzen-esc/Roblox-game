@@ -14,6 +14,7 @@ local REWARD_BY_DAY = { 20, 30, 45, 65, 90, 120, 200 }
 
 local remotes = nil
 local rateLimiter = nil
+local analyticsService = nil
 
 local function onClaimDailyReward(player: Player)
 	if not rateLimiter:allow(player, "dailyReward", 1) then
@@ -44,12 +45,17 @@ local function onClaimDailyReward(player: Player)
 	data.coins += reward
 	data.dailyStreak = { lastClaimUnix = now, streakCount = streakCount }
 
+	if analyticsService then
+		analyticsService.logEconomy(player, true, "Coins", reward, data.coins, "TimedReward", "DailyReward")
+	end
+
 	PlayerDataService.sync(player)
 end
 
-function DailyRewardService.init(remotesTable, rateLimiterInstance)
+function DailyRewardService.init(remotesTable, rateLimiterInstance, analyticsServiceModule)
 	remotes = remotesTable
 	rateLimiter = rateLimiterInstance
+	analyticsService = analyticsServiceModule
 
 	remotes[RemoteNames.CLAIM_DAILY_REWARD_REQUEST].OnServerEvent:Connect(onClaimDailyReward)
 end

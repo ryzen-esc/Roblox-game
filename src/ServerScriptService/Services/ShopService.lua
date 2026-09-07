@@ -18,6 +18,8 @@ local TRACK_TO_FIELD = {
 
 local remotes = nil
 local rateLimiter = nil
+local achievementService = nil
+local analyticsService = nil
 
 local function onBuyUpgradeRequest(player: Player, payload)
 	if not rateLimiter:allow(player, "buyUpgrade", 0.2) then
@@ -49,12 +51,22 @@ local function onBuyUpgradeRequest(player: Player, payload)
 	data.coins -= cost
 	data[field] = currentLevel + 1
 
+	if analyticsService then
+		analyticsService.logFunnelStepOnce(player, data, "FirstUpgrade")
+		analyticsService.logEconomy(player, false, "Coins", cost, data.coins, "Shop", payload.track)
+	end
+	if achievementService then
+		achievementService.checkAll(player, data)
+	end
+
 	PlayerDataService.sync(player)
 end
 
-function ShopService.init(remotesTable, rateLimiterInstance)
+function ShopService.init(remotesTable, rateLimiterInstance, achievementServiceModule, analyticsServiceModule)
 	remotes = remotesTable
 	rateLimiter = rateLimiterInstance
+	achievementService = achievementServiceModule
+	analyticsService = analyticsServiceModule
 
 	remotes[RemoteNames.BUY_UPGRADE_REQUEST].OnServerEvent:Connect(onBuyUpgradeRequest)
 end

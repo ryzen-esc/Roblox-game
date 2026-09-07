@@ -68,13 +68,27 @@ function UIController.init()
 	coinsLabel.TextXAlignment = Enum.TextXAlignment.Left
 	coinsLabel.Parent = topBar
 
-	-- Toggle buttons (bottom right)
+	local featuredLabel = Instance.new("TextLabel")
+	featuredLabel.Name = "FeaturedLabel"
+	featuredLabel.Size = UDim2.new(0.5, 0, 1, 0)
+	featuredLabel.Position = UDim2.new(0.46, 0, 0, 0)
+	featuredLabel.BackgroundTransparency = 1
+	featuredLabel.Text = ""
+	featuredLabel.TextColor3 = Color3.fromRGB(150, 220, 255)
+	featuredLabel.Font = Enum.Font.Gotham
+	featuredLabel.TextScaled = true
+	featuredLabel.TextXAlignment = Enum.TextXAlignment.Right
+	featuredLabel.Parent = topBar
+
+	-- Toggle buttons (bottom right), stacked bottom-to-top: Shop, Tank, Achievements
 	local shopButton = newButton("Shop", UDim2.new(0.14, 0, 0.06, 0), UDim2.new(0.98, 0, 0.9, 0), Vector2.new(1, 1))
 	shopButton.Parent = screenGui
 
-	local tankButton = newButton("Tank", UDim2.new(0.14, 0, 0.06, 0), UDim2.new(0.98, 0.75, 0.9, 0), Vector2.new(1, 1))
-	tankButton.Position = UDim2.new(0.98, 0, 0.82, 0)
+	local tankButton = newButton("Tank", UDim2.new(0.14, 0, 0.06, 0), UDim2.new(0.98, 0, 0.82, 0), Vector2.new(1, 1))
 	tankButton.Parent = screenGui
+
+	local achvButton = newButton("Achv", UDim2.new(0.14, 0, 0.06, 0), UDim2.new(0.98, 0, 0.74, 0), Vector2.new(1, 1))
+	achvButton.Parent = screenGui
 
 	-- Reel minigame bar (hidden by default)
 	local reelFrame = newFrame({
@@ -149,6 +163,21 @@ function UIController.init()
 	rareBanner.Text = ""
 	rareBanner.Parent = screenGui
 	newCorner(8).Parent = rareBanner
+
+	-- Achievement-unlocked banner (own slot below the rare-catch banner so the two never overlap)
+	local achievementBanner = Instance.new("TextLabel")
+	achievementBanner.Name = "AchievementBanner"
+	achievementBanner.Size = UDim2.new(0.6, 0, 0.055, 0)
+	achievementBanner.Position = UDim2.new(0.5, 0, -0.1, 0)
+	achievementBanner.AnchorPoint = Vector2.new(0.5, 0.5)
+	achievementBanner.BackgroundColor3 = Color3.fromRGB(90, 190, 230)
+	achievementBanner.BackgroundTransparency = 0.1
+	achievementBanner.TextColor3 = Color3.fromRGB(15, 25, 35)
+	achievementBanner.Font = Enum.Font.GothamBold
+	achievementBanner.TextScaled = true
+	achievementBanner.Text = ""
+	achievementBanner.Parent = screenGui
+	newCorner(8).Parent = achievementBanner
 
 	-- Shop panel
 	local shopFrame = newFrame({
@@ -234,6 +263,81 @@ function UIController.init()
 	tankLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	tankLayout.Parent = tankList
 
+	-- Achievements panel
+	local achvFrame = newFrame({
+		Name = "AchvFrame",
+		Size = UDim2.new(0.5, 0, 0.7, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(30, 30, 40),
+		Visible = false,
+		Parent = screenGui,
+	})
+	newCorner(12).Parent = achvFrame
+
+	local achvTitle = Instance.new("TextLabel")
+	achvTitle.Size = UDim2.new(1, 0, 0.08, 0)
+	achvTitle.BackgroundTransparency = 1
+	achvTitle.Text = "Achievements"
+	achvTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+	achvTitle.Font = Enum.Font.GothamBold
+	achvTitle.TextScaled = true
+	achvTitle.Parent = achvFrame
+
+	local achvCloseButton = newButton("X", UDim2.new(0.08, 0, 0.06, 0), UDim2.new(0.98, 0, 0.02, 0), Vector2.new(1, 0))
+	achvCloseButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+	achvCloseButton.Parent = achvFrame
+
+	local achvList = Instance.new("ScrollingFrame")
+	achvList.Name = "AchvList"
+	achvList.Size = UDim2.new(0.96, 0, 0.88, 0)
+	achvList.Position = UDim2.new(0.02, 0, 0.1, 0)
+	achvList.BackgroundTransparency = 1
+	achvList.CanvasSize = UDim2.new(0, 0, 0, 0)
+	achvList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	achvList.ScrollBarThickness = 6
+	achvList.Parent = achvFrame
+
+	local achvLayout = Instance.new("UIListLayout")
+	achvLayout.Padding = UDim.new(0, 6)
+	achvLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	achvLayout.Parent = achvList
+
+	-- Rebirth confirmation dialog (destructive action: resets Coins/Rod/Tank, so it's
+	-- gated behind an explicit confirm step rather than a single click)
+	local rebirthConfirmFrame = newFrame({
+		Name = "RebirthConfirmFrame",
+		Size = UDim2.new(0.4, 0, 0.28, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(30, 30, 40),
+		Visible = false,
+		Parent = screenGui,
+	})
+	newCorner(12).Parent = rebirthConfirmFrame
+
+	local rebirthConfirmLabel = Instance.new("TextLabel")
+	rebirthConfirmLabel.Name = "RebirthConfirmLabel"
+	rebirthConfirmLabel.Size = UDim2.new(0.9, 0, 0.55, 0)
+	rebirthConfirmLabel.Position = UDim2.new(0.05, 0, 0.05, 0)
+	rebirthConfirmLabel.BackgroundTransparency = 1
+	rebirthConfirmLabel.Text = "Rebirth resets your Coins, Rod, and Tank to start over, and permanently increases fish sell value. Your current fish will be sold first. Continue?"
+	rebirthConfirmLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	rebirthConfirmLabel.Font = Enum.Font.Gotham
+	rebirthConfirmLabel.TextScaled = true
+	rebirthConfirmLabel.TextWrapped = true
+	rebirthConfirmLabel.Parent = rebirthConfirmFrame
+
+	local rebirthConfirmButton =
+		newButton("Rebirth", UDim2.new(0.42, 0, 0.22, 0), UDim2.new(0.03, 0, 0.98, 0), Vector2.new(0, 1))
+	rebirthConfirmButton.BackgroundColor3 = Color3.fromRGB(230, 150, 60)
+	rebirthConfirmButton.Parent = rebirthConfirmFrame
+
+	local rebirthCancelButton =
+		newButton("Cancel", UDim2.new(0.42, 0, 0.22, 0), UDim2.new(0.97, 0, 0.98, 0), Vector2.new(1, 1))
+	rebirthCancelButton.BackgroundColor3 = Color3.fromRGB(90, 90, 100)
+	rebirthCancelButton.Parent = rebirthConfirmFrame
+
 	-- Daily reward popup
 	local dailyFrame = newFrame({
 		Name = "DailyFrame",
@@ -260,34 +364,58 @@ function UIController.init()
 	claimButton.BackgroundColor3 = Color3.fromRGB(90, 190, 110)
 	claimButton.Parent = dailyFrame
 
-	shopButton.MouseButton1Click:Connect(function()
-		shopFrame.Visible = not shopFrame.Visible
+	local function closeAllPanels()
+		shopFrame.Visible = false
 		tankFrame.Visible = false
+		achvFrame.Visible = false
+	end
+
+	shopButton.MouseButton1Click:Connect(function()
+		local nowVisible = not shopFrame.Visible
+		closeAllPanels()
+		shopFrame.Visible = nowVisible
 	end)
 	shopCloseButton.MouseButton1Click:Connect(function()
 		shopFrame.Visible = false
 	end)
 	tankButton.MouseButton1Click:Connect(function()
-		tankFrame.Visible = not tankFrame.Visible
-		shopFrame.Visible = false
+		local nowVisible = not tankFrame.Visible
+		closeAllPanels()
+		tankFrame.Visible = nowVisible
 	end)
 	tankCloseButton.MouseButton1Click:Connect(function()
 		tankFrame.Visible = false
+	end)
+	achvButton.MouseButton1Click:Connect(function()
+		local nowVisible = not achvFrame.Visible
+		closeAllPanels()
+		achvFrame.Visible = nowVisible
+	end)
+	achvCloseButton.MouseButton1Click:Connect(function()
+		achvFrame.Visible = false
+	end)
+	rebirthCancelButton.MouseButton1Click:Connect(function()
+		rebirthConfirmFrame.Visible = false
 	end)
 
 	return {
 		gui = screenGui,
 		coinsLabel = coinsLabel,
+		featuredLabel = featuredLabel,
 		reelFrame = reelFrame,
 		reelIndicator = reelIndicator,
 		tapButton = tapButton,
 		catchLabel = catchLabel,
 		rareBanner = rareBanner,
+		achievementBanner = achievementBanner,
 		shopList = shopList,
 		tankList = tankList,
 		sellAllButton = sellAllButton,
+		achvList = achvList,
 		dailyFrame = dailyFrame,
 		claimButton = claimButton,
+		rebirthConfirmFrame = rebirthConfirmFrame,
+		rebirthConfirmButton = rebirthConfirmButton,
 	}
 end
 
@@ -302,9 +430,13 @@ function UIController.flashLabel(label, text, holdSeconds)
 	end)
 end
 
-function UIController.slideInBanner(banner, text)
+--- visibleY lets multiple banners (rare-catch, achievement) occupy different screen slots
+-- so simultaneous events don't slide two banners into the same spot. Defaults to the
+-- original rare-catch banner's position for backward compatibility.
+function UIController.slideInBanner(banner, text, visibleY: number?)
+	local y = visibleY or 0.08
 	banner.Text = text
-	TweenService:Create(banner, TweenInfo.new(0.4), { Position = UDim2.new(0.5, 0, 0.08, 0) }):Play()
+	TweenService:Create(banner, TweenInfo.new(0.4), { Position = UDim2.new(0.5, 0, y, 0) }):Play()
 	task.delay(3, function()
 		TweenService:Create(banner, TweenInfo.new(0.4), { Position = UDim2.new(0.5, 0, -0.1, 0) }):Play()
 	end)

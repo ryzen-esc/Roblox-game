@@ -1,3 +1,5 @@
+local Constants = require(script.Parent.Constants)
+
 --- Fish species. Rarity (RarityConfig) is a separate modifier applied on top of these,
 -- so N species x M rarities gives N*M meaningful variety from N+M authored rows.
 -- Adding a new species later (new content drop) is: one row here + reuse of FishModelFactory.
@@ -63,18 +65,40 @@ function FishData.getById(speciesId: string)
 	return nil
 end
 
---- Rolls a species uniformly among species unlocked at the player's rod level.
-function FishData.rollSpecies(rodLevel: number): string
+--- Deterministic "species of the day": the same species for every player on every server
+-- for a given UTC day, changing at midnight UTC with zero authored content or stored state.
+-- A cheap, free reason to fish something specific today vs. yesterday.
+function FishData.getFeaturedSpeciesId(): string
+	local dayIndex = math.floor(os.time() / 86400) % #FishData.Species
+	return FishData.Species[dayIndex + 1].id
+end
+
+--- Rolls a species among those unlocked at the player's rod level. If featuredSpeciesId is
+-- eligible, it gets Constants.FEATURED_SPECIES_WEIGHT_MULTIPLIER x the weight of every other
+-- eligible species (still just a bias, never a guarantee or an exclusion of the rest).
+function FishData.rollSpecies(rodLevel: number, featuredSpeciesId: string?): string
 	local eligible = {}
+	local totalWeight = 0
 	for _, species in FishData.Species do
 		if rodLevel >= species.minRodLevel then
-			table.insert(eligible, species)
+			local weight = (species.id == featuredSpeciesId) and Constants.FEATURED_SPECIES_WEIGHT_MULTIPLIER or 1
+			table.insert(eligible, { species = species, weight = weight })
+			totalWeight += weight
 		end
 	end
 	if #eligible == 0 then
 		return FishData.Species[1].id
 	end
-	return eligible[math.random(1, #eligible)].id
+
+	local roll = math.random() * totalWeight
+	local cumulative = 0
+	for _, entry in eligible do
+		cumulative += entry.weight
+		if roll <= cumulative then
+			return entry.species.id
+		end
+	end
+	return eligible[1].species.id
 end
 
 return FishData

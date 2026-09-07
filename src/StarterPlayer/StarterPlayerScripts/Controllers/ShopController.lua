@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local UpgradeConfig = require(ReplicatedStorage.Shared.UpgradeConfig)
 local MonetizationIds = require(ReplicatedStorage.Shared.MonetizationIds)
+local Constants = require(ReplicatedStorage.Shared.Constants)
 
 local ClientState = require(script.Parent.ClientState)
 
@@ -100,6 +101,38 @@ function ShopController.init(remotes, ui)
 		end
 	end
 
+	order += 1
+	local _rebirthRow, rebirthLabel, rebirthButton = newRow(ui.shopList, order)
+	rebirthButton.Text = "Rebirth"
+	rebirthButton.BackgroundColor3 = Color3.fromRGB(230, 150, 60)
+	rebirthButton.MouseButton1Click:Connect(function()
+		ui.rebirthConfirmFrame.Visible = true
+	end)
+	ui.rebirthConfirmButton.MouseButton1Click:Connect(function()
+		remotes.RebirthRequest:FireServer()
+		ui.rebirthConfirmFrame.Visible = false
+	end)
+
+	local function refreshRebirthLabel()
+		local data = ClientState.current
+		local eligible = data.rodLevel >= UpgradeConfig.Tracks.Rod.maxLevel and data.tankLevel >= UpgradeConfig.Tracks.Tank.maxLevel
+		local bonusPct = math.floor((data.rebirths or 0) * Constants.REBIRTH_SELL_BONUS_PER_REBIRTH * 100)
+		if eligible then
+			rebirthLabel.Text =
+				("Rebirth %d (+%d%% sell value) - Resets Coins/Rod/Tank for +%d%% more"):format(
+					data.rebirths or 0,
+					bonusPct,
+					math.floor(Constants.REBIRTH_SELL_BONUS_PER_REBIRTH * 100)
+				)
+			rebirthButton.Active = true
+			rebirthButton.BackgroundTransparency = 0
+		else
+			rebirthLabel.Text = ("Rebirth %d (+%d%% sell value) - Max Rod & Tank to unlock"):format(data.rebirths or 0, bonusPct)
+			rebirthButton.Active = false
+			rebirthButton.BackgroundTransparency = 0.6
+		end
+	end
+
 	for _, info in GAME_PASS_INFO do
 		order += 1
 		local _row, label, button = newRow(ui.shopList, order)
@@ -128,8 +161,13 @@ function ShopController.init(remotes, ui)
 		end)
 	end
 
-	refreshUpgradeLabels()
-	ClientState.Changed.Event:Connect(refreshUpgradeLabels)
+	local function refreshAll()
+		refreshUpgradeLabels()
+		refreshRebirthLabel()
+	end
+
+	refreshAll()
+	ClientState.Changed.Event:Connect(refreshAll)
 end
 
 return ShopController

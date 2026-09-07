@@ -32,4 +32,14 @@ Constants.DAILY_STREAK_MAX_DAYS = 7
 -- Rare-catch announcement threshold (rarity ids at/above this index in RarityConfig trigger a broadcast)
 Constants.ANNOUNCE_MIN_RARITY_INDEX = 4 -- Epic and Legendary (see RarityConfig order)
 
+-- Rebirth / prestige: available once Rod and Tank are both maxed. Resets Coins/Rod/Tank
+-- (and clears fish -- they're auto-sold first) in exchange for a permanent, stacking
+-- sell-value multiplier. 0.15 = +15% sell value per rebirth, forever.
+Constants.REBIRTH_SELL_BONUS_PER_REBIRTH = 0.15
+
+-- Daily featured species: one species per day (server-clock UTC day, same for every player
+-- on every server) gets a weight boost in the species roll -- a free, cheap reason to fish
+-- something different today vs. yesterday without any new content authored.
+Constants.FEATURED_SPECIES_WEIGHT_MULTIPLIER = 2
+
 return Constants

@@ -9,6 +9,7 @@ local FishingController = require(Controllers.FishingController)
 local TankRenderController = require(Controllers.TankRenderController)
 local ShopController = require(Controllers.ShopController)
 local InventoryController = require(Controllers.InventoryController)
+local AchievementController = require(Controllers.AchievementController)
 
 local remotesFolder = ReplicatedStorage:WaitForChild("Remotes")
 local remotes = {}
@@ -26,5 +27,6 @@ FishingController.init(remotes, ui)
 TankRenderController.init()
 ShopController.init(remotes, ui)
 InventoryController.init(remotes, ui)
+AchievementController.init(remotes, ui)
 
 print("Fish Tank Simulator: client bootstrap complete.")

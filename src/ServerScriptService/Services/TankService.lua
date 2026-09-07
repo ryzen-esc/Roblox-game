@@ -3,9 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local RemoteNames = require(ReplicatedStorage.Shared.RemoteNames)
-local FishData = require(ReplicatedStorage.Shared.FishData)
-local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
-local UpgradeConfig = require(ReplicatedStorage.Shared.UpgradeConfig)
+local FishValue = require(ReplicatedStorage.Shared.FishValue)
 
 local PlayerDataService = require(script.Parent.PlayerDataService)
 
@@ -21,17 +19,12 @@ local SYNC_EVERY_N_TICKS = 4 -- ~60s between growth-driven syncs; growth is slow
 local remotes = nil
 local rateLimiter = nil
 local monetizationService = nil
+local achievementService = nil
+local analyticsService = nil
 
-local function sellValue(player: Player, fish, rodLevel: number): number
-	local species = FishData.getById(fish.speciesId)
-	local rarity = RarityConfig.getById(fish.rarityId)
-	if not species or not rarity then
-		return 0
-	end
-	local growthValue = 0.5 + 0.5 * fish.growth
-	local rodBonus = UpgradeConfig.getRodValueBonus(rodLevel)
+local function sellValue(player: Player, fish, data): number
 	local coinMultiplier = monetizationService and monetizationService.getCoinMultiplier(player) or 1
-	return math.floor(species.baseValue * rarity.valueMultiplier * growthValue * rodBonus * coinMultiplier)
+	return FishValue.compute(fish, data.rodLevel, data.rebirths, coinMultiplier)
 end
 
 local function onSellFishRequest(player: Player, payload)
@@ -51,19 +44,29 @@ local function onSellFishRequest(player: Player, payload)
 
 	if payload.all == true then
 		for uid, fish in data.fish do
-			totalEarned += sellValue(player, fish, data.rodLevel)
+			totalEarned += sellValue(player, fish, data)
 			data.fish[uid] = nil
 		end
 	elseif type(payload.uid) == "string" then
 		local fish = data.fish[payload.uid]
 		if fish then
-			totalEarned += sellValue(player, fish, data.rodLevel)
+			totalEarned += sellValue(player, fish, data)
 			data.fish[payload.uid] = nil
 		end
 	end
 
 	if totalEarned > 0 then
 		data.coins += totalEarned
+		data.lifetimeCoinsEarned = (data.lifetimeCoinsEarned or 0) + totalEarned
+
+		if analyticsService then
+			analyticsService.logFunnelStepOnce(player, data, "FirstSell")
+			analyticsService.logEconomy(player, true, "Coins", totalEarned, data.coins, "Gameplay", "SellFish")
+		end
+		if achievementService then
+			achievementService.checkAll(player, data)
+		end
+
 		PlayerDataService.sync(player)
 	end
 end
@@ -95,10 +98,12 @@ local function tickGrowth()
 	end
 end
 
-function TankService.init(remotesTable, rateLimiterInstance, monetizationServiceModule)
+function TankService.init(remotesTable, rateLimiterInstance, monetizationServiceModule, achievementServiceModule, analyticsServiceModule)
 	remotes = remotesTable
 	rateLimiter = rateLimiterInstance
 	monetizationService = monetizationServiceModule
+	achievementService = achievementServiceModule
+	analyticsService = analyticsServiceModule
 
 	remotes[RemoteNames.SELL_FISH_REQUEST].OnServerEvent:Connect(onSellFishRequest)
 

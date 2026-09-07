@@ -12,6 +12,7 @@ ClientState.current = {
 	fish = {},
 	dailyStreak = { lastClaimUnix = 0, streakCount = 0 },
 	achievements = {},
+	totalFishCaught = 0,
 }
 
 ClientState.Changed = Instance.new("BindableEvent")

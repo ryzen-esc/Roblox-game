@@ -11,8 +11,10 @@ local RemoteNames = require(ReplicatedStorage.Shared.RemoteNames)
 local PlayerDataService = {}
 
 local dataStore = DataStoreService:GetDataStore("PlayerData_v1")
+local backupDataStore = DataStoreService:GetDataStore("PlayerDataBackup_v1")
 local sessions = {} -- [userId] = { data = {...}, loaded = bool }
 local remotes = nil
+local analyticsService = nil
 
 local function defaultData()
 	return {
@@ -28,6 +30,10 @@ local function defaultData()
 		processedReceipts = {},
 		rareBaitBoostExpiresUnix = 0,
 		lastSaveUnix = os.time(),
+		totalFishCaught = 0,
+		rarityCatchCounts = {},
+		lifetimeCoinsEarned = 0,
+		analyticsFunnelLogged = {},
 	}
 end
 
@@ -53,6 +59,26 @@ local function applyOfflineGrowth(data)
 	for _, fish in data.fish do
 		fish.growth = math.clamp(fish.growth + growthDelta, 0, 1)
 	end
+end
+
+--- Best-effort secondary copy of a player's data, written after every successful primary
+-- save. If the primary save is ever corrupted or unrecoverable (DataStore incidents do
+-- happen), this is the recovery path -- loaded only when the primary load exhausts all its
+-- retries. Fire-and-forget: a failed backup write just means the next successful save tries
+-- again a couple minutes later at the next autosave; it never blocks or fails the real save.
+local function backupSave(userId: number, data)
+	task.spawn(function()
+		pcall(function()
+			backupDataStore:SetAsync("Player_" .. userId, data)
+		end)
+	end)
+end
+
+local function backupLoad(userId: number)
+	local ok, result = pcall(function()
+		return backupDataStore:GetAsync("Player_" .. userId)
+	end)
+	return ok and result or nil
 end
 
 local function loadWithRetry(userId: number)
@@ -87,6 +113,7 @@ local function saveWithRetry(userId: number, data, maxRetries: number?)
 		end)
 
 		if ok then
+			backupSave(userId, data)
 			return true
 		end
 
@@ -100,6 +127,13 @@ end
 
 function PlayerDataService.load(player: Player)
 	local raw = loadWithRetry(player.UserId)
+	if not raw then
+		local backup = backupLoad(player.UserId)
+		if backup then
+			warn("PlayerDataService: primary load failed for", player.UserId, "- recovered from backup")
+			raw = backup
+		end
+	end
 	local data = raw and withDefaults(raw) or defaultData()
 
 	applyOfflineGrowth(data)
@@ -107,6 +141,10 @@ function PlayerDataService.load(player: Player)
 
 	sessions[player.UserId] = { data = data, loaded = true }
 	PlayerDataService.sync(player)
+
+	if analyticsService then
+		analyticsService.logFunnelStepOnce(player, data, "Joined")
+	end
 end
 
 function PlayerDataService.isLoaded(player: Player): boolean
@@ -174,11 +212,13 @@ function PlayerDataService.sync(player: Player)
 		fish = fishList,
 		dailyStreak = data.dailyStreak,
 		achievements = data.achievements,
+		totalFishCaught = data.totalFishCaught,
 	})
 end
 
-function PlayerDataService.init(remotesTable)
+function PlayerDataService.init(remotesTable, analyticsServiceModule)
 	remotes = remotesTable
+	analyticsService = analyticsServiceModule
 
 	Players.PlayerAdded:Connect(function(player)
 		PlayerDataService.load(player)

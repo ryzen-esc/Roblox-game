@@ -9,4 +9,6 @@ return {
 	CLAIM_DAILY_REWARD_REQUEST = "ClaimDailyRewardRequest",
 	PLAYER_DATA_SYNC = "PlayerDataSync",
 	RARE_CATCH_ANNOUNCEMENT = "RareCatchAnnouncement",
+	ACHIEVEMENT_UNLOCKED = "AchievementUnlocked",
+	REBIRTH_REQUEST = "RebirthRequest",
 }

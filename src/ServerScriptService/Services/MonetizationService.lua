@@ -25,6 +25,7 @@ local DEV_PRODUCT_COIN_AMOUNTS = {
 }
 
 local ownedPasses = {} -- [userId] = { [passName] = true }
+local analyticsService = nil
 
 local function productNameFromId(productId: number): string?
 	for name, id in MonetizationService.DeveloperProducts do
@@ -93,7 +94,11 @@ local function processReceipt(receiptInfo)
 	end
 
 	if DEV_PRODUCT_COIN_AMOUNTS[productName] then
-		data.coins += DEV_PRODUCT_COIN_AMOUNTS[productName]
+		local amount = DEV_PRODUCT_COIN_AMOUNTS[productName]
+		data.coins += amount
+		if analyticsService then
+			analyticsService.logEconomy(player, true, "Coins", amount, data.coins, "IAP", productName)
+		end
 	elseif productName == "InstantGrowth" then
 		for _, fish in data.fish do
 			if fish.growth < 1 then
@@ -120,7 +125,8 @@ local function processReceipt(receiptInfo)
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 
-function MonetizationService.init()
+function MonetizationService.init(analyticsServiceModule)
+	analyticsService = analyticsServiceModule
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(onPromptGamePassPurchaseFinished)
 	MarketplaceService.ProcessReceipt = processReceipt
 
