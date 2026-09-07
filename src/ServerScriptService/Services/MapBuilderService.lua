@@ -141,7 +141,13 @@ local function buildPlot(index: number)
 	billboard.Name = "NameTag"
 	billboard.Size = UDim2.new(0, 200, 0, 50)
 	billboard.StudsOffset = Vector3.new(0, 1, 0)
-	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 40 -- only render when a player is actually near this plot
+	-- Not AlwaysOnTop: with 50 plots in a grid, an always-on-top label renders through
+	-- everything regardless of distance/occlusion, so any view that catches more than a
+	-- few plots turns into a wall of overlapping text. Disabled starts (Enabled = false)
+	-- for the same reason -- an empty plot has nothing useful to announce, and with most
+	-- plots unclaimed on a lightly populated server this alone removes most of the clutter.
+	billboard.Enabled = false
 	billboard.Parent = sign
 
 	local label = Instance.new("TextLabel")
@@ -194,6 +200,10 @@ function MapBuilderService.assignPlot(player: Player)
 	if label then
 		label.Text = player.Name .. "'s Tank"
 	end
+	local billboard = sign and sign:FindFirstChild("NameTag")
+	if billboard then
+		billboard.Enabled = true
+	end
 
 	-- Player instance Attributes replicate to clients automatically, so the client can
 	-- find its own plot without a dedicated remote.
@@ -221,6 +231,10 @@ function MapBuilderService.releasePlot(player: Player)
 	local label = sign and sign:FindFirstChild("OwnerLabel", true)
 	if label then
 		label.Text = "Empty Tank"
+	end
+	local billboard = sign and sign:FindFirstChild("NameTag")
+	if billboard then
+		billboard.Enabled = false
 	end
 
 	plotByUserId[player.UserId] = nil
