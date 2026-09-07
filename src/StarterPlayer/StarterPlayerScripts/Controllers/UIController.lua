@@ -40,7 +40,6 @@ end
 function UIController.init()
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "MainUI"
-	screenGui.ResetOnSpawnGui = false
 	screenGui.ResetOnSpawn = false
 	screenGui.IgnoreGuiInset = false
 	screenGui.Parent = player:WaitForChild("PlayerGui")
